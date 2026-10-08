@@ -726,5 +726,45 @@ const clk=new THREE.Clock();let T=reduce?14:0,rb=false,rs=false;const tgt=new TH
   location.href='mailto:hello@iona-water.com?subject='+encodeURIComponent(cs.value)+'&body='+encodeURIComponent($('cg').value+'\n\n'+n.value.trim()+' <'+em.value.trim()+'>');
   close();f.reset();toast('<b>MESSAGE READY</b>Thank you. Your email app has opened with your message - press send and our team will reach out shortly.')});
 })();
+// ===== IONA continuity layer =====
+// Paste this block at the end of your main script.
+// 1) smoothed scroll value (window.__sm.s) so scenes never "pop" on wheel jumps
+// 2) one persistent mist + particle canvas that runs through EVERY scene,
+//    re-tinted per scene, and swells at each scene boundary to hide the hand-off
+//    (storyboard closing note: "Fog, particles and wind run through every scene")
+(()=>{
+  const SM=window.__sm={s:scrollY/innerHeight};
+  const cv=document.createElement('canvas');cv.id='mist';
+  cv.style.cssText='position:fixed;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;mix-blend-mode:screen';
+  document.body.insertBefore(cv,$('v4').nextSibling);
+  const g=cv.getContext('2d');let W=0,H=0;
+  const fit=()=>{W=cv.width=innerWidth>>1;H=cv.height=innerHeight>>1};addEventListener('resize',fit);fit();
+
+  // tint per scroll position (hero > bubbles/cap > crystal > valley > underwater)
+  const TINT=[[0,[140,175,205]],[1.5,[110,185,205]],[4.3,[120,180,205]],[5.5,[170,205,225]],[7.5,[190,205,200]],[9,[60,130,170]],[11,[40,100,140]]];
+  const tint=s=>{for(let i=1;i<TINT.length;i++)if(s<=TINT[i][0]){const a=TINT[i-1],b=TINT[i],t=Math.min(1,Math.max(0,(s-a[0])/(b[0]-a[0])));return a[1].map((v,k)=>v+(b[1][k]-v)*t)}return TINT[TINT.length-1][1]};
+  // scene boundaries: cap/bubbles, crystal in, valley, drop in, plunge
+  const B=[1.0,4.3,5.3,7.1,8.9,9.8];
+  const bump=s=>B.reduce((a,b)=>a+Math.exp(-Math.pow((s-b)/.2,2)),0);
+
+  const P=Array.from({length:64},()=>({x:Math.random(),y:Math.random(),r:.08+Math.random()*.22,vx:.004+Math.random()*.01,vy:(Math.random()-.5)*.004,ph:Math.random()*6.28}));
+  let last=performance.now();
+  (function loop(now){requestAnimationFrame(loop);
+    const dt=Math.min(.05,(now-last)/1000);last=now;
+    // smooth scroll (exponential, ~140ms): the single most important "connected" feel
+    SM.s+=(scrollY/innerHeight-SM.s)*(1-Math.exp(-dt*7));
+    const s=SM.s,c=tint(s);
+    // mist thins out underwater (bubbles take over) and in the closing scene
+    const under=Math.min(1,Math.max(0,(s-9.3)/.9)),fin=Math.min(1,Math.max(0,(s-12.9)/.7));
+    const A=(.07+.24*bump(s))*(1-.7*under)*(1-.6*fin);
+    g.clearRect(0,0,W,H);
+    for(const p of P){
+      p.x+=p.vx*dt*(1+bump(s)*3);p.y+=p.vy*dt+Math.sin(now*.0003+p.ph)*.00008;
+      if(p.x>1.3)p.x=-.3;if(p.y<-.2)p.y=1.2;if(p.y>1.2)p.y=-.2;
+      const X=p.x*W,Y=p.y*H,R=p.r*W,gr=g.createRadialGradient(X,Y,0,X,Y,R);
+      gr.addColorStop(0,`rgba(${c[0]|0},${c[1]|0},${c[2]|0},${A})`);gr.addColorStop(1,`rgba(${c[0]|0},${c[1]|0},${c[2]|0},0)`);
+      g.fillStyle=gr;g.fillRect(X-R,Y-R,R*2,R*2)}
+  })(last);
+})();
 </script>
 </body></html>
